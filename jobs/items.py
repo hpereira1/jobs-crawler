@@ -10,7 +10,7 @@ class JobsItem(scrapy.Item):
     # define the fields for your item here like:
     # name = scrapy.Field()
     title = scrapy.Field()
-    level = scrapy.Field()
+    seniority = scrapy.Field()
     description = scrapy.Field()
     published_date = scrapy.Field()
     scraping_date = scrapy.Field()

@@ -1,34 +1,46 @@
-from http.client import responses
-
+from datetime import date
 import scrapy
 from jobs.items import JobsItem
-from datetime import date
+from scrapy.http import Request
 
 class VagasSpider(scrapy.Spider):
     name = 'vagas'
 
-    start_urls = ['https://www.vagas.com.br/vagas-de-desenvolvedor?']
-    total_jobs = []
-    def parse(self, response):
-        job_table = response.xpath('/html/body/div[1]/div[3]/div/div/div[2]/section/section/div/ul')
-        for job in job_table.xpath('.//li'):
-            link = job.xpath('.//a/@href').get()
+    links_file = "/home/pero/PycharmProjects/webscrapyjobs/jobs/jobs/urls_vagas.txt"
+
+    # Inicia a requisição para cada link de vaga, passando parse como callback
+    def start_requests(self):
+        try:
+            with open(self.links_file, "r", encoding="utf-8") as f:
+                links = f.readlines()
+        except FileNotFoundError:
+            self.logger.error("file {self.links_file} not found")
+            return
+
+        for link in links:
+            link = link.strip()
             if link:
-                yield response.follow(link,self.parse_job)
+                yield Request(link, callback=self.parse)
 
-
-    def parse_job(self,response):
+    def parse(self, response):
+        # Extrai as informações detalhadas de cada vaga
         job = JobsItem()
-        job['title'] = response.css('.job-shortdescription__title::text').get().strip()
-        job['level'] = response.css('.job-hierarchylist__item > span:nth-child(1)::text').get().strip()
-        job['company'] = response.css('.job-shortdescription__company::text').get().strip()
-        job['location'] = response.css('.info-localizacao::text').get().strip()
-        job['description'] = response.css('.info-modelo-contratual::text').get().strip()
-        published_text = ''.join([text.strip() for text in response.xpath('/html/body/div[1]/section[1]/div/div[1]/ul/li[1]//text()').getall() if text.strip()])
+        job['title'] = response.css('.job-shortdescription__title::text').get(default='').strip()
+        job['seniority'] = response.css('.job-hierarchylist__item > span:nth-child(1)::text').get(default='').strip()
+        job['company'] = response.css('.job-shortdescription__company::text').get(default='').strip()
+        job['location'] = response.css('.info-localizacao::text').get(default='').strip()
+        job['description'] = response.css('.info-modelo-contratual::text').get(default='').strip()
+
+        # Extrai a data de publicação e formata
+        published_text = ''.join([text.strip() for text in response.xpath(
+            '/html/body/div[1]/section[1]/div/div[1]/ul/li[1]//text()').getall() if text.strip()])
         date_str = published_text.replace('Publicada em ', '')
         job['published_date'] = date_str
+
+        # Data de scraping
         job['scraping_date'] = date.today().strftime('%d/%m/%Y')
+
+        # Link para a vaga
         job['link'] = response.url
-            # TO DO
-                #Fazer a spider clicar em Quero mais vagas e extrair os dados novos. fazer iterativamente
+
         yield job
